@@ -155,15 +155,35 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
+      {/* Demo Data Banner - Top of Page */}
+      <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3 flex items-center gap-3 relative z-50">
+        <svg 
+          className="w-5 h-5 text-orange-700 flex-shrink-0" 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth={2} 
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
+          />
+        </svg>
+        <span className="text-sm font-semibold text-orange-700">
+          Demo Data: Synthetic data for illustration only.
+        </span>
+      </div>
+
       {/* Diagonal Watermark */}
-      <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center overflow-hidden">
+      <div className="fixed inset-0 pointer-events-none z-40 flex items-center justify-center overflow-hidden">
         <div
-          className="text-yellow-200/30 font-bold select-none"
+          className="text-yellow-200/25 font-bold select-none"
           style={{
-            fontSize: '8rem',
+            fontSize: '7rem',
             transform: 'rotate(-45deg)',
             whiteSpace: 'nowrap',
-            letterSpacing: '0.5rem'
+            letterSpacing: '0.3rem'
           }}
         >
           DEMO DASHBOARD
@@ -171,7 +191,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Header */}
-      <div className="bg-white border-b shadow-sm">
+      <div className="bg-white border-b shadow-sm relative z-10">
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center gap-6">
             {/* Logo on the left */}
@@ -608,6 +628,100 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Footer Note */}
+      <footer className="mt-12 pt-6 border-t border-gray-200 bg-gray-50">
+        <div className="container mx-auto px-6">
+          <div className="bg-gray-800 text-white rounded-lg p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+              {/* Contact Information */}
+              <div>
+                <h4 className="text-sm font-semibold mb-3">Contact Us</h4>
+                <div className="text-xs space-y-1 text-gray-300">
+                  <div>United States: +1-252-477-1362</div>
+                  <div>United Kingdom: +44-203-957-8553 / +44-203-949-5508</div>
+                  <div>Australia: +61-8-7924-7805</div>
+                  <div>India: +91-848-285-0837</div>
+                </div>
+              </div>
+
+              {/* Business Enquiry */}
+              <div>
+                <h4 className="text-sm font-semibold mb-3">For Business Enquiry</h4>
+                <div className="text-xs text-gray-300 space-y-2">
+                  <div>sales@coherentmarketinsights.com</div>
+                  <div className="mt-3">
+                    <div className="font-medium mb-1">Sales Office (U.S.):</div>
+                    <div>Coherent Market Insights Pvt Ltd,</div>
+                    <div>533 Airport Boulevard, Suite 400,</div>
+                    <div>Burlingame, CA 94010, United States</div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="font-medium mb-1">Asia Pacific Intelligence Center (India):</div>
+                    <div>Coherent Market Insights Pvt Ltd,</div>
+                    <div>401-402, Bremen Business Center,</div>
+                    <div>University Road, Aundh,</div>
+                    <div>Pune - 411007, India.</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Menu Links */}
+              <div>
+                <h4 className="text-sm font-semibold mb-3">Menu</h4>
+                <div className="text-xs text-gray-300 space-y-1">
+                  <div>About Us</div>
+                  <div>Industries</div>
+                  <div>Services</div>
+                  <div>Contact Us</div>
+                  <div>Careers</div>
+                </div>
+                <h4 className="text-sm font-semibold mb-3 mt-4">Reader Club</h4>
+                <div className="text-xs text-gray-300 space-y-1">
+                  <div>Latest Insights</div>
+                  <div>Press Release</div>
+                  <div>Infographics</div>
+                  <div>Blogs</div>
+                  <div>News</div>
+                </div>
+                <h4 className="text-sm font-semibold mb-3 mt-4">Help</h4>
+                <div className="text-xs text-gray-300 space-y-1">
+                  <div>Become Reseller</div>
+                  <div>How To Order?</div>
+                  <div>Terms and Conditions</div>
+                  <div>Privacy Policy</div>
+                  <div>Disclaimer</div>
+                  <div>Sitemap</div>
+                  <div>Feeds</div>
+                </div>
+              </div>
+
+              {/* Social Media & Payment */}
+              <div>
+                <h4 className="text-sm font-semibold mb-3">Connect With Us</h4>
+                <div className="flex gap-2 mb-6">
+                  <div className="w-8 h-8 bg-gray-700 rounded flex items-center justify-center text-xs font-semibold">in</div>
+                  <div className="w-8 h-8 bg-gray-700 rounded flex items-center justify-center text-xs font-semibold">X</div>
+                  <div className="w-8 h-8 bg-gray-700 rounded flex items-center justify-center text-xs font-semibold">f</div>
+                  <div className="w-8 h-8 bg-gray-700 rounded flex items-center justify-center text-xs font-semibold">P</div>
+                </div>
+                <h4 className="text-sm font-semibold mb-3">Secure Payment By</h4>
+                <div className="flex flex-wrap gap-2">
+                  <div className="px-3 py-1.5 bg-white text-gray-800 rounded text-xs font-semibold">VISA</div>
+                  <div className="px-3 py-1.5 bg-white text-gray-800 rounded text-xs font-semibold">DISCOVER</div>
+                  <div className="px-3 py-1.5 bg-white text-gray-800 rounded text-xs font-semibold">MasterCard</div>
+                  <div className="px-3 py-1.5 bg-white text-gray-800 rounded text-xs font-semibold">AMEX</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Copyright */}
+            <div className="pt-4 border-t border-gray-700 text-center text-xs text-gray-400">
+              © 2025 Coherent Market Insights Pvt Ltd. All Rights Reserved.
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

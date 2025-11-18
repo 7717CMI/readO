@@ -272,7 +272,7 @@ export function EnhancedGeographyFilter({
                     </div>
                     <span className="text-sm font-medium text-gray-900">{region}</span>
                     <span className="text-xs text-gray-500">
-                      ({regionCountries.length} {regionCountries.length === 1 ? 'state' : 'states'})
+                      ({regionCountries.length} {regionCountries.length === 1 ? 'selection' : 'selections'})
                     </span>
                   </button>
                 </div>
@@ -337,5 +337,6 @@ export function EnhancedGeographyFilter({
     </div>
   )
 }
+
 
 
