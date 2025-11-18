@@ -33,10 +33,27 @@ export function filterData(
     }
   })
 
+  // Helper function for flexible geography matching
+  const isGeographyMatch = (recordGeography: string, selectedGeographies: string[]): boolean => {
+    if (selectedGeographies.length === 0) return true
+    
+    return selectedGeographies.some(geo => {
+      // Exact match
+      if (recordGeography === geo) return true
+      // Record geography starts with selected (e.g., "West India (5 states)" matches "West India")
+      if (recordGeography.startsWith(geo)) return true
+      // Selected starts with record (e.g., "West India" matches "West India (5 states)")
+      if (geo.startsWith(recordGeography)) return true
+      // Contains check (bidirectional)
+      if (recordGeography.includes(geo) || geo.includes(recordGeography)) return true
+      return false
+    })
+  }
+
   const filtered = data.filter((record) => {
     // Geography filter - if no geographies selected, show all
-    const geoMatch = filters.geographies.length === 0 ||
-      filters.geographies.includes(record.geography)
+    // Use flexible matching to handle geography name variations
+    const geoMatch = isGeographyMatch(record.geography, filters.geographies)
     
     if (!geoMatch) {
       return false
@@ -313,6 +330,7 @@ export function prepareGroupedBarData(
           const segment = record.segment
           
           // Find which selected segment this record belongs to (for matching)
+          // Use the same simple matching logic as filterData uses
           let matchingSegment = segment
           let recordMatched = false
           if (segments.length > 0) {
@@ -320,63 +338,11 @@ export function prepareGroupedBarData(
               // Exact match
               if (record.segment === seg) return true
               
-              // Normalize both paths by removing B2B/B2C prefix if present
-              const normalizePath = (path: string) => {
-                const parts = path.split(' > ')
-                // Remove B2B or B2C from start if present
-                if (parts[0] === 'B2B' || parts[0] === 'B2C') {
-                  return parts.slice(1).join(' > ')
-                }
-                return path
-              }
-              
-              const normalizedRecord = normalizePath(record.segment)
-              const normalizedSelected = normalizePath(seg)
-              
-              // Match after normalization
-              if (normalizedRecord === normalizedSelected) return true
-              
-              // Record is a child of selected segment (after normalization)
-              if (normalizedRecord.startsWith(normalizedSelected + ' > ')) return true
-              
-              // Selected segment is a parent of record (after normalization)
-              if (normalizedSelected.includes(' > ') && normalizedRecord.startsWith(normalizedSelected)) return true
-              
-              // Also check original paths
+              // Check if selected segment is a parent of this record's segment
               if (record.segment.startsWith(seg + ' > ')) return true
-              if (seg.includes(' > ') && record.segment.startsWith(seg)) return true
               
-              // Check if the last part (product name) matches
-              const recordParts = record.segment.split(' > ')
-              const selectedParts = seg.split(' > ')
-              const recordLast = recordParts[recordParts.length - 1].toLowerCase()
-              const selectedLast = selectedParts[selectedParts.length - 1].toLowerCase()
-              
-              // If last parts match and one contains the other's path
-              if (recordLast === selectedLast || 
-                  recordLast.includes(selectedLast) || 
-                  selectedLast.includes(recordLast)) {
-                // Check if the paths are similar (at least 2 matching parts)
-                const recordNormalized = normalizePath(record.segment)
-                const selectedNormalized = normalizePath(seg)
-                const recordNormalizedParts = recordNormalized.split(' > ')
-                const selectedNormalizedParts = selectedNormalized.split(' > ')
-                
-                // Count matching parts from the end
-                let matchingParts = 0
-                const minLength = Math.min(recordNormalizedParts.length, selectedNormalizedParts.length)
-                for (let i = 1; i <= minLength; i++) {
-                  if (recordNormalizedParts[recordNormalizedParts.length - i] === 
-                      selectedNormalizedParts[selectedNormalizedParts.length - i]) {
-                    matchingParts++
-                  } else {
-                    break
-                  }
-                }
-                
-                // If at least 2 parts match (including the product name), consider it a match
-                if (matchingParts >= 2) return true
-              }
+              // Check if this record's segment is a parent of the selected segment
+              if (seg.startsWith(record.segment + ' > ')) return true
               
               return false
             })
@@ -491,11 +457,23 @@ export function prepareGroupedBarData(
         })
         
       } else if (viewMode === 'geography-mode') {
-        // Stack segments within each geography bar
-        // Primary grouping: geographies (each becomes a bar)
-        // Secondary grouping: segments (stacked within each bar)
+        // In geography-mode with stacking:
+        // Primary grouping: segments (each segment becomes a bar group)
+        // Secondary grouping: geographies (stacked within each bar)
+        // Key format: segment::geography (to match chart component)
         
         const geoMap = new Map<string, Map<string, number>>()
+        
+        // Initialize geoMap with all selected geographies (or all unique geographies from records)
+        const allGeographies = geographies.length > 0 
+          ? geographies 
+          : Array.from(new Set(records.map(r => r.geography)))
+        
+        allGeographies.forEach(geo => {
+          if (!geoMap.has(geo)) {
+            geoMap.set(geo, new Map())
+          }
+        })
         
         records.forEach(record => {
           // Skip child geographies if India is selected (will aggregate separately)
@@ -503,18 +481,74 @@ export function prepareGroupedBarData(
             return
           }
           
-          const geography = record.geography
-          const segment = record.segment
-          
-          if (!geoMap.has(geography)) {
-            geoMap.set(geography, new Map())
+          // Normalize geography name to match selected geographies
+          let normalizedGeography = record.geography
+          if (geographies.length > 0) {
+            const matchingGeo = geographies.find(geo => {
+              const recordGeo = record.geography
+              if (recordGeo === geo) return true
+              if (recordGeo.startsWith(geo)) return true
+              if (geo.startsWith(recordGeo)) return true
+              if (recordGeo.includes(geo) || geo.includes(recordGeo)) return true
+              return false
+            })
+            if (matchingGeo) {
+              normalizedGeography = matchingGeo
+            }
           }
           
-          const segmentMap = geoMap.get(geography)!
-          const currentValue = segmentMap.get(segment) || 0
+          // Only process if this geography is in our map (matches selected geographies)
+          if (!geoMap.has(normalizedGeography)) {
+            return
+          }
+          
+          const segment = record.segment
+          
+          // Find which selected segment this record belongs to (for matching)
+          let matchingSegment = segment
+          let recordMatched = false
+          if (segments.length > 0) {
+            const found = segments.find(seg => {
+              // Exact match
+              if (record.segment === seg) return true
+              // Check if selected segment is a parent of this record's segment
+              if (record.segment.startsWith(seg + ' > ')) return true
+              // Check if this record's segment is a parent of the selected segment
+              if (seg.startsWith(record.segment + ' > ')) return true
+              return false
+            })
+            if (found) {
+              matchingSegment = found
+              recordMatched = true
+            }
+          } else {
+            // If no segments selected, include all records
+            recordMatched = true
+          }
+          
+          // Only process if record matched a selected segment (or no segments selected)
+          if (!recordMatched) {
+            return
+          }
+          
+          const segmentMap = geoMap.get(normalizedGeography)!
+          const currentValue = segmentMap.get(matchingSegment) || 0
           const recordValue = record.time_series[year] || 0
-          segmentMap.set(segment, currentValue + recordValue)
+          segmentMap.set(matchingSegment, currentValue + recordValue)
           })
+          
+          // Ensure all selected segments are included for all geographies (even if no data)
+          if (segments.length > 0) {
+            Array.from(geoMap.keys()).forEach(geo => {
+              const segMap = geoMap.get(geo)!
+              segments.forEach(selectedSeg => {
+                // If this segment doesn't exist for this geography, add it with 0 value
+                if (!segMap.has(selectedSeg)) {
+                  segMap.set(selectedSeg, 0)
+                }
+              })
+            })
+          }
           
           // Add India aggregated values if India is selected
           // IMPORTANT: Only aggregate if segments are selected, to avoid mixing different entities
@@ -549,10 +583,12 @@ export function prepareGroupedBarData(
             })
           }
           
-        // Create stacked data keys: geography_segment
+        // Create stacked data keys: segment::geography (to match chart component series format)
         geoMap.forEach((segmentMap, geography) => {
           segmentMap.forEach((value, segment) => {
-            const key = `${geography}::${segment}`
+            // In geography-mode, primary is segment, secondary is geography
+            // So key format should be: segment::geography
+            const key = `${segment}::${geography}`
             dataPoint[key] = value
           })
         })
@@ -596,9 +632,19 @@ export function prepareGroupedBarData(
           }
         } else if (viewMode === 'geography-mode') {
           // In geography-mode, aggregate by geography name
-          // If geographies are selected, use the selected geography name as key
-          if (geographies.length > 0 && geographies.includes(record.geography)) {
-            key = record.geography
+          // Normalize geography name to match selected geographies (handle name variations)
+          if (geographies.length > 0) {
+            // Find which selected geography this record matches
+            const matchingGeo = geographies.find(geo => {
+              const recordGeo = record.geography
+              if (recordGeo === geo) return true
+              if (recordGeo.startsWith(geo)) return true
+              if (geo.startsWith(recordGeo)) return true
+              if (recordGeo.includes(geo) || geo.includes(recordGeo)) return true
+              return false
+            })
+            // Use the selected geography name as key (normalized) to match with series
+            key = matchingGeo || record.geography
           } else {
             key = record.geography
           }

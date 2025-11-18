@@ -23,7 +23,7 @@ interface FilterPreset {
 // This array is just for the structure, actual filters are computed based on data
 
 export function FilterPresets() {
-  const { filters, updateFilters, data } = useDashboardStore()
+  const { filters, updateFilters, data, resetFilters } = useDashboardStore()
   const [customPresets, setCustomPresets] = useState<FilterPreset[]>([])
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [presetName, setPresetName] = useState('')
@@ -64,7 +64,55 @@ export function FilterPresets() {
   const applyPreset = (preset: FilterPreset) => {
     console.log('🎯 Applying preset:', preset.name, preset.filters)
 
-    // Merge preset filters with current filters
+    // If Top Markets preset, completely clear all filters first, then apply preset filters
+    if (preset.id === 'top-markets') {
+      // Get current data to build complete filter state
+      const { data: currentData } = useDashboardStore.getState()
+      
+      // Get default filter structure
+      const startYear = currentData?.metadata?.start_year || 2020
+      const forecastYear = currentData?.metadata?.forecast_year || 2032
+      const firstSegmentType = currentData?.dimensions?.segments 
+        ? Object.keys(currentData.dimensions.segments)[0] 
+        : 'By End-Use*Product Type'
+      
+      // First, completely clear all filters (empty arrays)
+      const clearedFilters: FilterState = {
+        geographies: [],
+        segments: [],
+        segmentType: firstSegmentType,
+        yearRange: [startYear, forecastYear] as [number, number],
+        dataType: 'value',
+        viewMode: 'geography-mode',
+        businessType: 'B2B',
+      }
+      
+      // Clear filters first
+      console.log('🧹 Clearing all filters first...')
+      useDashboardStore.setState({ filters: clearedFilters })
+      
+      // Then apply preset filters after a brief delay to ensure clear happens first
+      setTimeout(() => {
+        const newFilters: FilterState = {
+          ...clearedFilters,
+          ...preset.filters,
+          // Ensure arrays are properly set (not merged)
+          geographies: preset.filters.geographies || [],
+          segments: preset.filters.segments || [],
+        } as FilterState
+        
+        console.log('🎯 Final filters being applied (after clear):', newFilters)
+        useDashboardStore.setState({ filters: newFilters })
+        
+        // Ensure chart group is set to market-analysis so grouped bar chart is visible
+        const { setSelectedChartGroup } = useDashboardStore.getState()
+        setSelectedChartGroup('market-analysis')
+      }, 10)
+      
+      return
+    }
+
+    // For other presets, merge with current filters
     const newFilters: Partial<FilterState> = { ...preset.filters }
 
     // If preset doesn't specify certain filters, keep current ones

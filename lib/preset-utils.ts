@@ -267,11 +267,13 @@ export function getTopCountriesByCAGR(
 
 /**
  * Create dynamic filter configuration for Top Market preset
+ * Completely rewritten to match actual data structure
  * @param data - The comparison data
  * @returns Partial FilterState with dynamic values
  */
 export function createTopMarketFilters(data: ComparisonData | null): Partial<FilterState> {
   if (!data) {
+    console.warn('⚠️ Top Markets Preset: No data provided')
     return {
       viewMode: 'geography-mode',
       geographies: [],
@@ -282,50 +284,206 @@ export function createTopMarketFilters(data: ComparisonData | null): Partial<Fil
     }
   }
 
-  // Simple approach: Get top 3 regions by market value
-  const topRegions = getTopRegionsByMarketValue(data, 2024, 3)
-  const selectedGeographies = topRegions.length > 0 ? topRegions : ['West India', 'South India', 'North India']
-
-  // Dynamically find segments that exist for the selected geographies
-  const records = data.data.value.geography_segment_matrix
-  const segmentsForGeos = new Set<string>()
-  
-  records.forEach(record => {
-    if (selectedGeographies.includes(record.geography) && 
-        record.segment_type === 'By End-Use*Product Type' &&
-        record.segment.startsWith('B2B >')) {
-      segmentsForGeos.add(record.segment)
+  try {
+    const records = data.data?.value?.geography_segment_matrix
+    if (!records || !Array.isArray(records) || records.length === 0) {
+      console.warn('⚠️ Top Markets Preset: No records found in data')
+      return {
+        viewMode: 'geography-mode',
+        geographies: [],
+        segments: [],
+        segmentType: 'By End-Use*Product Type',
+        yearRange: [2024, 2028],
+        dataType: 'value',
+        businessType: 'B2B'
+      }
     }
-  })
-  
-  // Get first 5 segments that actually exist, sorted by market value
-  const availableSegments = Array.from(segmentsForGeos)
-    .map(segment => {
-      // Calculate total value for this segment across selected geographies
-      const totalValue = records
-        .filter(r => r.segment === segment && selectedGeographies.includes(r.geography))
-        .reduce((sum, r) => sum + (r.time_series?.[2024] || 0), 0)
-      return { segment, totalValue }
+
+    const baseYear = data.metadata?.base_year || 2024
+    const segmentType = 'By End-Use*Product Type'
+    
+    // Step 1: Find top 3 regions by total market value in base year
+    // Aggregate all segments for each region
+    const regionTotals = new Map<string, number>()
+    
+    records.forEach(record => {
+      try {
+        // Only process region-level geographies (with fallback to dimensions)
+        const isRegion = record.geography_level === 'region' || 
+                        (data.dimensions?.geographies?.regions || []).includes(record.geography)
+        
+        if (!isRegion) return
+        
+        // Skip global level
+        if (record.geography === 'India' || record.geography === 'Global') return
+        
+        // Only process B2B segments of the correct type
+        if (record.segment_type !== segmentType) return
+        if (!record.segment || !record.segment.startsWith('B2B >')) return
+        
+        // Get value for base year
+        const timeSeries = record.time_series || {}
+        const value = timeSeries[baseYear] || 0
+        if (value <= 0) return // Skip zero values
+        
+        // Aggregate by geography name (use exact name from data)
+        const currentTotal = regionTotals.get(record.geography) || 0
+        regionTotals.set(record.geography, currentTotal + value)
+      } catch (err) {
+        console.warn('⚠️ Error processing record in Top Markets preset:', err, record)
+      }
     })
-    .sort((a, b) => b.totalValue - a.totalValue)
-    .slice(0, 5)
-    .map(item => item.segment)
-
-  console.log('📊 Top Markets Preset:', {
-    geographies: selectedGeographies,
-    segments: availableSegments,
-    totalRecords: records.length,
-    foundSegments: availableSegments.length
-  })
-
-  return {
-    viewMode: 'geography-mode',
-    geographies: selectedGeographies,
-    segments: availableSegments.length > 0 ? availableSegments : [],
-    segmentType: 'By End-Use*Product Type',
-    yearRange: [2024, 2028],
-    dataType: 'value',
-    businessType: 'B2B'
+    
+    // Sort regions by total value and get top 3
+    const sortedRegions = Array.from(regionTotals.entries())
+      .sort((a, b) => b[1] - a[1]) // Sort descending by value
+      .slice(0, 3)
+      .map(([geography]) => geography) // Extract geography names only
+    
+    // Use actual geography names from data (not normalized)
+    let selectedGeographies = sortedRegions.length > 0 ? sortedRegions : []
+    
+    // Fallback: If no regions found by geography_level, try using dimensions
+    if (selectedGeographies.length === 0 && data.dimensions?.geographies?.regions) {
+      const regionsFromDimensions = data.dimensions.geographies.regions.slice(0, 3)
+      console.log('📊 Top Markets: Using regions from dimensions as fallback:', regionsFromDimensions)
+      selectedGeographies = regionsFromDimensions
+    }
+    
+    if (selectedGeographies.length === 0) {
+      console.warn('⚠️ No regions with data found for Top Markets preset', {
+        totalRecords: records.length,
+        sampleRecords: records.slice(0, 3).map(r => ({
+          geography: r.geography,
+          geography_level: r.geography_level,
+          segment: r.segment?.substring(0, 50)
+        }))
+      })
+      return {
+        viewMode: 'geography-mode',
+        geographies: [],
+        segments: [],
+        segmentType: segmentType,
+        yearRange: [baseYear, baseYear + 4],
+        dataType: 'value',
+        businessType: 'B2B'
+      }
+    }
+  
+    // Step 2: Find segments that exist for the selected regions
+    // Collect all unique segments that have data for at least one selected geography
+    const segmentValueMap = new Map<string, number>() // segment -> total value across selected geographies
+    
+    records.forEach(record => {
+      try {
+        // Must match one of the selected geographies (exact match first, then flexible)
+        const geoMatches = selectedGeographies.includes(record.geography) ||
+          selectedGeographies.some(geo => 
+            record.geography.startsWith(geo) || 
+            geo.startsWith(record.geography)
+          )
+        
+        if (!geoMatches) return
+        
+        // Must be correct segment type and B2B
+        if (record.segment_type !== segmentType) return
+        if (!record.segment || !record.segment.startsWith('B2B >')) return
+        
+        // Must have data in base year
+        const timeSeries = record.time_series || {}
+        const value = timeSeries[baseYear] || 0
+        if (value <= 0) return
+        
+        // Aggregate value for this segment across all selected geographies
+        const currentTotal = segmentValueMap.get(record.segment) || 0
+        segmentValueMap.set(record.segment, currentTotal + value)
+      } catch (err) {
+        console.warn('⚠️ Error processing segment in Top Markets preset:', err, record)
+      }
+    })
+    
+    // Step 3: Select top 5 segments by total value
+    const sortedSegments = Array.from(segmentValueMap.entries())
+      .sort((a, b) => b[1] - a[1]) // Sort descending by value
+      .slice(0, 5)
+      .map(([segment]) => segment) // Extract segment names only
+    
+    if (sortedSegments.length === 0) {
+      console.warn('⚠️ No segments with data found for Top Markets preset', {
+        selectedGeographies,
+        totalRecords: records.length,
+        sampleSegments: Array.from(new Set(records
+          .filter(r => selectedGeographies.includes(r.geography))
+          .map(r => r.segment)
+          .filter(s => s && s.startsWith('B2B >'))
+        )).slice(0, 10)
+      })
+      return {
+        viewMode: 'geography-mode',
+        geographies: selectedGeographies,
+        segments: [],
+        segmentType: segmentType,
+        yearRange: [baseYear, baseYear + 4],
+        dataType: 'value',
+        businessType: 'B2B'
+      }
+    }
+    
+    // Step 4: Verify data exists for the selected combination
+    // Count records that match both selected geographies and segments
+    const matchingRecords = records.filter(record => {
+      try {
+        const geoMatches = selectedGeographies.includes(record.geography) ||
+          selectedGeographies.some(geo => 
+            record.geography.startsWith(geo) || 
+            geo.startsWith(record.geography)
+          )
+        if (!geoMatches) return false
+        if (!sortedSegments.includes(record.segment)) return false
+        if (record.segment_type !== segmentType) return false
+        const timeSeries = record.time_series || {}
+        const value = timeSeries[baseYear] || 0
+        return value > 0
+      } catch {
+        return false
+      }
+    })
+    
+    console.log('📊 Top Markets Preset (Rewritten):', {
+      selectedGeographies,
+      selectedSegments: sortedSegments,
+      totalRecords: records.length,
+      matchingRecords: matchingRecords.length,
+      regionTotals: Array.from(regionTotals.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([geo, val]) => ({ geography: geo, totalValue: val })),
+      segmentTotals: Array.from(segmentValueMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([seg, val]) => ({ segment: seg.substring(0, 60), totalValue: val }))
+    })
+    
+    return {
+      viewMode: 'geography-mode',
+      geographies: selectedGeographies,
+      segments: sortedSegments,
+      segmentType: segmentType,
+      yearRange: [baseYear, baseYear + 4] as [number, number],
+      dataType: 'value',
+      businessType: 'B2B'
+    }
+  } catch (error) {
+    console.error('❌ Error in createTopMarketFilters:', error)
+    return {
+      viewMode: 'geography-mode',
+      geographies: [],
+      segments: [],
+      segmentType: 'By End-Use*Product Type',
+      yearRange: [2024, 2028],
+      dataType: 'value',
+      businessType: 'B2B'
+    }
   }
 }
 
@@ -354,10 +512,23 @@ export function createGrowthLeadersFilters(data: ComparisonData | null): Partial
   const segmentsForGeos = new Set<string>()
   
   records.forEach(record => {
-    if (selectedGeographies.includes(record.geography) && 
+    // Handle geography name variations (e.g., "North India" vs "North India (5 states)")
+    const geoMatches = selectedGeographies.some(geo => {
+      return record.geography === geo || 
+             record.geography.startsWith(geo) || 
+             geo.startsWith(record.geography) ||
+             record.geography.includes(geo) ||
+             geo.includes(record.geography)
+    })
+    
+    if (geoMatches && 
         record.segment_type === 'By End-Use*Product Type' &&
         record.segment.startsWith('B2B >')) {
-      segmentsForGeos.add(record.segment)
+      // Only add segments that have actual data (non-zero values)
+      const hasData = record.time_series && Object.values(record.time_series).some(val => val > 0)
+      if (hasData) {
+        segmentsForGeos.add(record.segment)
+      }
     }
   })
   
@@ -365,17 +536,40 @@ export function createGrowthLeadersFilters(data: ComparisonData | null): Partial
   const availableSegments = Array.from(segmentsForGeos)
     .map(segment => {
       // Calculate average CAGR for this segment across selected geographies
-      const segmentRecords = records.filter(
-        r => r.segment === segment && selectedGeographies.includes(r.geography) && r.cagr !== undefined && r.cagr !== null
-      )
+      const segmentRecords = records.filter(r => {
+        if (r.segment !== segment || r.cagr === undefined || r.cagr === null) return false
+        // Use flexible geography matching
+        return selectedGeographies.some(geo => {
+          return r.geography === geo || 
+                 r.geography.startsWith(geo) || 
+                 geo.startsWith(r.geography) ||
+                 r.geography.includes(geo) ||
+                 geo.includes(r.geography)
+        })
+      })
       const avgCAGR = segmentRecords.length > 0
         ? segmentRecords.reduce((sum, r) => sum + (r.cagr || 0), 0) / segmentRecords.length
         : 0
       return { segment, avgCAGR }
     })
+    .filter(item => item.avgCAGR > 0) // Only include segments with positive CAGR
     .sort((a, b) => b.avgCAGR - a.avgCAGR)
     .slice(0, 3)
     .map(item => item.segment)
+  
+  // If no segments found, return empty array to prevent errors
+  if (availableSegments.length === 0) {
+    console.warn('⚠️ No segments with data found for Growth Leaders preset')
+    return {
+      viewMode: 'geography-mode',
+      geographies: [],
+      segments: [],
+      segmentType: 'By End-Use*Product Type',
+      yearRange: [2024, 2032],
+      dataType: 'value',
+      businessType: 'B2B'
+    }
+  }
 
   console.log('📊 Growth Leaders Preset:', {
     geographies: selectedGeographies,
@@ -421,10 +615,23 @@ export function createEmergingMarketsFilters(data: ComparisonData | null): Parti
   const segmentsForGeos = new Set<string>()
   
   records.forEach(record => {
-    if (selectedGeographies.includes(record.geography) && 
+    // Handle geography name variations (e.g., "North India" vs "North India (5 states)")
+    const geoMatches = selectedGeographies.some(geo => {
+      return record.geography === geo || 
+             record.geography.startsWith(geo) || 
+             geo.startsWith(record.geography) ||
+             record.geography.includes(geo) ||
+             geo.includes(record.geography)
+    })
+    
+    if (geoMatches && 
         record.segment_type === 'By End-Use*Product Type' &&
         record.segment.startsWith('B2B >')) {
-      segmentsForGeos.add(record.segment)
+      // Only add segments that have actual data (non-zero values)
+      const hasData = record.time_series && Object.values(record.time_series).some(val => val > 0)
+      if (hasData) {
+        segmentsForGeos.add(record.segment)
+      }
     }
   })
   
@@ -432,17 +639,40 @@ export function createEmergingMarketsFilters(data: ComparisonData | null): Parti
   const availableSegments = Array.from(segmentsForGeos)
     .map(segment => {
       // Calculate average CAGR for this segment across selected geographies
-      const segmentRecords = records.filter(
-        r => r.segment === segment && selectedGeographies.includes(r.geography) && r.cagr !== undefined && r.cagr !== null
-      )
+      const segmentRecords = records.filter(r => {
+        if (r.segment !== segment || r.cagr === undefined || r.cagr === null) return false
+        // Use flexible geography matching
+        return selectedGeographies.some(geo => {
+          return r.geography === geo || 
+                 r.geography.startsWith(geo) || 
+                 geo.startsWith(r.geography) ||
+                 r.geography.includes(geo) ||
+                 geo.includes(r.geography)
+        })
+      })
       const avgCAGR = segmentRecords.length > 0
         ? segmentRecords.reduce((sum, r) => sum + (r.cagr || 0), 0) / segmentRecords.length
         : 0
       return { segment, avgCAGR }
     })
+    .filter(item => item.avgCAGR > 0) // Only include segments with positive CAGR
     .sort((a, b) => b.avgCAGR - a.avgCAGR)
     .slice(0, 5)
     .map(item => item.segment)
+  
+  // If no segments found, return empty array to prevent errors
+  if (availableSegments.length === 0) {
+    console.warn('⚠️ No segments with data found for Emerging Markets preset')
+    return {
+      viewMode: 'geography-mode',
+      geographies: [],
+      segments: [],
+      segmentType: 'By End-Use*Product Type',
+      yearRange: [2024, 2032],
+      dataType: 'value',
+      businessType: 'B2B'
+    }
+  }
 
   console.log('📊 Emerging Markets Preset:', {
     geographies: selectedGeographies,
