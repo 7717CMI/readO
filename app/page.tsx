@@ -12,7 +12,6 @@ import { ComparisonTable } from '@/components/charts/ComparisonTable'
 import { WaterfallChart } from '@/components/charts/WaterfallChart'
 import { D3BubbleChartIndependent } from '@/components/charts/D3BubbleChartIndependent'
 import { CompetitiveIntelligence } from '@/components/charts/CompetitiveIntelligence'
-import CustomerIntelligenceHeatmap from '@/components/charts/CustomerIntelligenceHeatmap'
 import DistributorsIntelligence from '@/components/charts/DistributorsIntelligenceTable'
 import { InsightsPanel } from '@/components/InsightsPanel'
 import { FilterPresets } from '@/components/filters/FilterPresets'
@@ -25,7 +24,7 @@ import { Lightbulb, X, Layers, LayoutGrid } from 'lucide-react'
 export default function DashboardPage() {
   const { setData, setLoading, setError, data, isLoading, error, filters, selectedChartGroup } = useDashboardStore()
   const [mounted, setMounted] = useState(false)
-  const [activeTab, setActiveTab] = useState<'bar' | 'line' | 'heatmap' | 'table' | 'waterfall' | 'bubble' | 'competitive-intelligence' | 'customer-intelligence'>('bar')
+  const [activeTab, setActiveTab] = useState<'bar' | 'line' | 'heatmap' | 'table' | 'waterfall' | 'bubble' | 'competitive-intelligence' | 'distributor-intelligence'>('bar')
   const [showInsights, setShowInsights] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [viewMode, setViewMode] = useState<'tabs' | 'vertical'>('tabs')
@@ -41,13 +40,14 @@ export default function DashboardPage() {
 
   // Map chart IDs to tab values
   const chartIdToTab: Record<string, typeof activeTab> = {
+    'grouped-bar': 'bar',
     'multi-line': 'line',
     'heatmap': 'heatmap',
     'comparison-table': 'table',
     'waterfall': 'waterfall',
     'bubble': 'bubble',
     'competitive-intelligence': 'competitive-intelligence',
-    'customer-intelligence': 'customer-intelligence'
+    'distributor-intelligence': 'distributor-intelligence'
   }
 
   // Auto-switch to first available tab when chart group changes
@@ -158,7 +158,7 @@ export default function DashboardPage() {
       {/* Diagonal Watermark */}
       <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center overflow-hidden">
         <div
-          className="text-gray-300/20 font-bold select-none"
+          className="text-yellow-200/30 font-bold select-none"
           style={{
             fontSize: '8rem',
             transform: 'rotate(-45deg)',
@@ -173,16 +173,24 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="bg-white border-b shadow-sm">
         <div className="container mx-auto px-6 py-6">
-          <div className="flex flex-col items-center">
-            <div className="flex items-center gap-4 mb-2">
+          <div className="flex items-center gap-6">
+            {/* Logo on the left */}
+            <div className="flex-shrink-0">
               <img src="/jsons/logo.png" alt="Logo" className="h-12 w-auto" />
-              <h1 className="text-4xl font-bold text-gray-900">
+            </div>
+            
+            {/* Title and subtitle centered */}
+            <div className="flex-1 flex flex-col items-center text-center">
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">
                 Coherent Dashboard
               </h1>
+              <h2 className="text-xl text-black">
+                India Spices Market Analysis & Forecast: 2020-2032
+              </h2>
             </div>
-            <h2 className="text-xl text-black text-center">
-              {data?.metadata?.market_name || 'Sample Market'} Analysis & Forecast: {data?.metadata?.start_year || 2020}-{data?.metadata?.forecast_year || 2032}
-            </h2>
+            
+            {/* Empty space on the right for balance */}
+            <div className="flex-shrink-0 w-12"></div>
           </div>
         </div>
       </div>
@@ -361,16 +369,16 @@ export default function DashboardPage() {
                             🏆 Competitive Intelligence
                           </button>
                         )}
-                        {isChartVisible('customer-intelligence') && (
+                        {isChartVisible('distributor-intelligence') && (
                           <button
-                            onClick={() => setActiveTab('customer-intelligence')}
+                            onClick={() => setActiveTab('distributor-intelligence')}
                             className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                              activeTab === 'customer-intelligence'
+                              activeTab === 'distributor-intelligence'
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-black hover:text-black hover:border-gray-300'
                             }`}
                           >
-                            👥 Customer Intelligence
+                            📦 Distributor Intelligence
                           </button>
                         )}
                       </>
@@ -463,20 +471,12 @@ export default function DashboardPage() {
                       </div>
                     )}
                     
-                    {activeTab === 'customer-intelligence' && (
-                      <div id="customer-intelligence-chart" className="space-y-8">
-                        <div>
-                          <CustomerIntelligenceHeatmap 
-                            title="Customer Intelligence - Industry Category × Region" 
-                            height={500}
-                          />
-                        </div>
-                        <div className="mt-8 pt-8 border-t border-gray-200">
-                          <DistributorsIntelligence 
-                            title="Distributors Intelligence Database" 
-                            height={500}
-                          />
-                        </div>
+                    {activeTab === 'distributor-intelligence' && (
+                      <div id="distributor-intelligence-chart">
+                        <DistributorsIntelligence 
+                          title="Distributors Intelligence Database" 
+                          height={600}
+                        />
                       </div>
                     )}
                   </>
@@ -550,22 +550,13 @@ export default function DashboardPage() {
                       </div>
                     )}
                     
-                    {isChartVisible('customer-intelligence') && (
-                      <div className="space-y-8">
-                        <div className="border-b pb-8">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-4">👥 Customer Intelligence</h3>
-                          <CustomerIntelligenceHeatmap 
-                            title="Customer Intelligence - Industry Category × Region" 
-                            height={450}
-                          />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900 mb-4">📦 Distributors Intelligence Database</h3>
-                          <DistributorsIntelligence 
-                            title="Distributors Intelligence Database" 
-                            height={500}
-                          />
-                        </div>
+                    {isChartVisible('distributor-intelligence') && (
+                      <div className="border-b pb-8">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">📦 Distributor Intelligence</h3>
+                        <DistributorsIntelligence 
+                          title="Distributors Intelligence Database" 
+                          height={600}
+                        />
                       </div>
                     )}
                   </div>

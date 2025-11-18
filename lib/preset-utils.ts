@@ -286,25 +286,42 @@ export function createTopMarketFilters(data: ComparisonData | null): Partial<Fil
   const topRegions = getTopRegionsByMarketValue(data, 2024, 3)
   const selectedGeographies = topRegions.length > 0 ? topRegions : ['West India', 'South India', 'North India']
 
-  // Get some popular B2B segments that have data
-  const popularSegments = [
-    'B2B > Food & Beverage > Foodservice / HoReCa > Single / Individual Spices > Chilli',
-    'B2B > Food & Beverage > Foodservice / HoReCa > Single / Individual Spices > Turmeric Powder',
-    'B2B > Food & Beverage > Foodservice / HoReCa > Single / Individual Spices > Cumin',
-    'B2B > Non-Food Industrial > Nutraceuticals & Dietary Supplements > Single / Individual Spices > Turmeric Powder',
-    'B2B > Non-Food Industrial > Nutraceuticals & Dietary Supplements > Single / Individual Spices > Black Pepper'
-  ]
+  // Dynamically find segments that exist for the selected geographies
+  const records = data.data.value.geography_segment_matrix
+  const segmentsForGeos = new Set<string>()
+  
+  records.forEach(record => {
+    if (selectedGeographies.includes(record.geography) && 
+        record.segment_type === 'By End-Use*Product Type' &&
+        record.segment.startsWith('B2B >')) {
+      segmentsForGeos.add(record.segment)
+    }
+  })
+  
+  // Get first 5 segments that actually exist, sorted by market value
+  const availableSegments = Array.from(segmentsForGeos)
+    .map(segment => {
+      // Calculate total value for this segment across selected geographies
+      const totalValue = records
+        .filter(r => r.segment === segment && selectedGeographies.includes(r.geography))
+        .reduce((sum, r) => sum + (r.time_series?.[2024] || 0), 0)
+      return { segment, totalValue }
+    })
+    .sort((a, b) => b.totalValue - a.totalValue)
+    .slice(0, 5)
+    .map(item => item.segment)
 
   console.log('📊 Top Markets Preset:', {
     geographies: selectedGeographies,
-    segments: popularSegments,
-    totalRecords: data?.data?.value?.geography_segment_matrix?.length || 0
+    segments: availableSegments,
+    totalRecords: records.length,
+    foundSegments: availableSegments.length
   })
 
   return {
     viewMode: 'geography-mode',
     geographies: selectedGeographies,
-    segments: popularSegments,
+    segments: availableSegments.length > 0 ? availableSegments : [],
     segmentType: 'By End-Use*Product Type',
     yearRange: [2024, 2028],
     dataType: 'value',
@@ -332,22 +349,44 @@ export function createGrowthLeadersFilters(data: ComparisonData | null): Partial
   const topRegions = getTopRegionsByCAGR(data, 2)
   const selectedGeographies = topRegions.length > 0 ? topRegions : ['West India', 'East India']
 
-  // Use 3 key segments for growth analysis
-  const growthSegments = [
-    'B2B > Food & Beverage > Foodservice / HoReCa > Single / Individual Spices > Chilli',
-    'B2B > Non-Food Industrial > Nutraceuticals & Dietary Supplements > Single / Individual Spices > Turmeric Powder',
-    'B2B > Food & Beverage > Foodservice / HoReCa > Single / Individual Spices > Black Pepper'
-  ]
+  // Dynamically find segments that exist for the selected geographies
+  const records = data.data.value.geography_segment_matrix
+  const segmentsForGeos = new Set<string>()
+  
+  records.forEach(record => {
+    if (selectedGeographies.includes(record.geography) && 
+        record.segment_type === 'By End-Use*Product Type' &&
+        record.segment.startsWith('B2B >')) {
+      segmentsForGeos.add(record.segment)
+    }
+  })
+  
+  // Get top 3 segments by CAGR that actually exist
+  const availableSegments = Array.from(segmentsForGeos)
+    .map(segment => {
+      // Calculate average CAGR for this segment across selected geographies
+      const segmentRecords = records.filter(
+        r => r.segment === segment && selectedGeographies.includes(r.geography) && r.cagr !== undefined && r.cagr !== null
+      )
+      const avgCAGR = segmentRecords.length > 0
+        ? segmentRecords.reduce((sum, r) => sum + (r.cagr || 0), 0) / segmentRecords.length
+        : 0
+      return { segment, avgCAGR }
+    })
+    .sort((a, b) => b.avgCAGR - a.avgCAGR)
+    .slice(0, 3)
+    .map(item => item.segment)
 
   console.log('📊 Growth Leaders Preset:', {
     geographies: selectedGeographies,
-    segments: growthSegments
+    segments: availableSegments,
+    foundSegments: availableSegments.length
   })
 
   return {
     viewMode: 'geography-mode',
     geographies: selectedGeographies,
-    segments: growthSegments,
+    segments: availableSegments.length > 0 ? availableSegments : [],
     segmentType: 'By End-Use*Product Type',
     yearRange: [2024, 2032],
     dataType: 'value',
@@ -377,24 +416,44 @@ export function createEmergingMarketsFilters(data: ComparisonData | null): Parti
     ? topCountries
     : ['Odisha', 'Uttar Pradesh', 'Assam', 'Tamil Nadu', 'Maharashtra']
 
-  // Use diverse segments for emerging market analysis
-  const emergingSegments = [
-    'B2B > Food & Beverage > Foodservice / HoReCa > Single / Individual Spices > Chilli',
-    'B2B > Food & Beverage > Foodservice / HoReCa > Single / Individual Spices > Turmeric Powder',
-    'B2B > Non-Food Industrial > Nutraceuticals & Dietary Supplements > Single / Individual Spices > Turmeric Powder',
-    'B2B > Food & Beverage > Foodservice / HoReCa > Single / Individual Spices > Cumin',
-    'B2B > Food & Beverage > Foodservice / HoReCa > Single / Individual Spices > Coriander'
-  ]
+  // Dynamically find segments that exist for the selected geographies
+  const records = data.data.value.geography_segment_matrix
+  const segmentsForGeos = new Set<string>()
+  
+  records.forEach(record => {
+    if (selectedGeographies.includes(record.geography) && 
+        record.segment_type === 'By End-Use*Product Type' &&
+        record.segment.startsWith('B2B >')) {
+      segmentsForGeos.add(record.segment)
+    }
+  })
+  
+  // Get top 5 segments by CAGR that actually exist
+  const availableSegments = Array.from(segmentsForGeos)
+    .map(segment => {
+      // Calculate average CAGR for this segment across selected geographies
+      const segmentRecords = records.filter(
+        r => r.segment === segment && selectedGeographies.includes(r.geography) && r.cagr !== undefined && r.cagr !== null
+      )
+      const avgCAGR = segmentRecords.length > 0
+        ? segmentRecords.reduce((sum, r) => sum + (r.cagr || 0), 0) / segmentRecords.length
+        : 0
+      return { segment, avgCAGR }
+    })
+    .sort((a, b) => b.avgCAGR - a.avgCAGR)
+    .slice(0, 5)
+    .map(item => item.segment)
 
   console.log('📊 Emerging Markets Preset:', {
     geographies: selectedGeographies,
-    segments: emergingSegments
+    segments: availableSegments,
+    foundSegments: availableSegments.length
   })
 
   return {
     viewMode: 'geography-mode',
     geographies: selectedGeographies,
-    segments: emergingSegments,
+    segments: availableSegments.length > 0 ? availableSegments : [],
     segmentType: 'By End-Use*Product Type',
     yearRange: [2024, 2032],
     dataType: 'value',

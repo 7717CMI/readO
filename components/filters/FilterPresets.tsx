@@ -80,6 +80,10 @@ export function FilterPresets() {
 
     console.log('🎯 Final filters being applied:', newFilters)
     updateFilters(newFilters as FilterState)
+    
+    // Ensure chart group is set to market-analysis so grouped bar chart is visible
+    const { setSelectedChartGroup } = useDashboardStore.getState()
+    setSelectedChartGroup('market-analysis')
   }
 
   const saveCurrentAsPreset = () => {

@@ -91,7 +91,7 @@ export interface DistributorsIntelligenceData {
 let cachedData: DistributorsIntelligenceData | null = null
 
 /**
- * Load distributors intelligence data from API
+ * Load distributors intelligence data from JSON file
  */
 export async function loadDistributorsIntelligenceData(): Promise<DistributorsIntelligenceData | null> {
   if (cachedData) {
@@ -99,10 +99,50 @@ export async function loadDistributorsIntelligenceData(): Promise<DistributorsIn
   }
 
   try {
-    // Return null - no data in clean version
-    return null
+    // Load from JSON file with cache busting
+    const timestamp = new Date().getTime()
+    const url = `/jsons/distributors-intelligence.json?t=${timestamp}`
+    console.log('🔍 Attempting to fetch distributors data from URL:', url)
+
+    const response = await fetch(url, {
+      cache: 'no-cache',
+      headers: {
+        'Accept': 'application/json',
+      }
+    })
+
+    console.log('🔍 Fetch response status:', response.status, response.statusText)
+
+    if (!response.ok) {
+      console.error(`❌ HTTP error! status: ${response.status}`)
+      throw new Error(`Failed to fetch distributors data: ${response.status} ${response.statusText}`)
+    }
+
+    const text = await response.text()
+    console.log('🔍 Response text length:', text.length)
+
+    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+      console.error('❌ Received HTML instead of JSON')
+      throw new Error('Received HTML instead of JSON - file may not exist at this path')
+    }
+
+    const data: DistributorsIntelligenceData = JSON.parse(text)
+    cachedData = data
+
+    console.log('✅ Loaded distributors intelligence data:', {
+      modules: data.metadata.modules,
+      module1Count: data.data['Module 1 - Standard']?.length || 0,
+      module2Count: data.data['Module 2 - Advance']?.length || 0,
+      module3Count: data.data['Module 3 - Premium']?.length || 0,
+    })
+
+    return data
   } catch (error) {
-    console.error('Error loading distributors intelligence data:', error)
+    console.error('❌ Error loading distributors intelligence data:', error)
+    if (error instanceof Error) {
+      console.error('❌ Error message:', error.message)
+      console.error('❌ Error stack:', error.stack)
+    }
     return null
   }
 }

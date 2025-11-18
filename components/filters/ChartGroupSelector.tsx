@@ -9,7 +9,7 @@ const iconMap = {
   'market-analysis': BarChart3,
   'coherent-opportunity': Target,
   'competitive-intelligence': Trophy,
-  'customer-intelligence': Users,
+  'distributor-intelligence': Users,
 }
 
 export function ChartGroupSelector() {
