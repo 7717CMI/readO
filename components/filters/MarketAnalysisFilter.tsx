@@ -274,7 +274,7 @@ export function MarketAnalysisFilter({ onFiltersChange }: MarketAnalysisFilterPr
     )
   }
 
-  const isSubcategoryPartiallySelected = (category: string, subcategory: string) => {
+  const isSubcategoryPartiallySelected = (category: string, subcategory: string): boolean => {
     const subcatKey = `${category}::${subcategory}`
     if (isSubcategorySelected(category, subcategory)) return true
     const subcatData = (currentData?.[category] as SegmentationStructure)?.[subcategory] as SegmentationStructure | undefined

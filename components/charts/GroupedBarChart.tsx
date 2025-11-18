@@ -227,7 +227,9 @@ function GroupedBarChartSingle({ title, height = 400, segmentFilter }: GroupedBa
   const hasDataValues = chartData.data.some(dp => {
     return chartData.series.some(seriesName => {
       const value = dp[seriesName]
-      return value !== undefined && value !== null && value > 0
+      if (value === undefined || value === null) return false
+      const numValue = typeof value === 'number' ? value : Number(value)
+      return !isNaN(numValue) && numValue > 0
     })
   })
   

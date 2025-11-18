@@ -1,4 +1,4 @@
-import type { ComparisonData, DataRecord, SegmentHierarchy } from './types'
+import type { ComparisonData, DataRecord, SegmentHierarchy, SegmentDimension } from './types'
 
 /**
  * Generate realistic dummy data for the India Spices Market
@@ -599,7 +599,7 @@ export async function generateRealisticData(dimensionsData: any): Promise<Compar
   const segmentTypes = dimensionsData.dimensions.segments
   
   // Generate data for each geography
-  geographies.all_geographies.forEach(geography => {
+  geographies.all_geographies.forEach((geography: string) => {
     const geographyLevel: 'global' | 'region' | 'country' = 
       geography === 'India' ? 'global' :
       geographies.regions.includes(geography) ? 'region' : 'country'
@@ -607,11 +607,14 @@ export async function generateRealisticData(dimensionsData: any): Promise<Compar
     const parentGeography = 
       geography === 'India' ? null :
       geographies.regions.includes(geography) ? 'India' :
-      Object.entries(geographies.countries).find(([_, states]) => states.includes(geography))?.[0] || null
+      Object.entries(geographies.countries).find(([_, states]) => {
+        return Array.isArray(states) && states.includes(geography)
+      })?.[0] || null
     
     // Generate data for each segment type
     Object.entries(segmentTypes).forEach(([segmentType, segmentDef]) => {
       if (!segmentDef) return
+      const typedSegmentDef = segmentDef as SegmentDimension
       
       if (segmentType === 'By End-Use*Product Type') {
         // Handle "By End-Use*Product Type" - use segmentation structure
@@ -666,9 +669,9 @@ export async function generateRealisticData(dimensionsData: any): Promise<Compar
             volumeRecords.push(volumeRecord)
           })
         }
-      } else if (segmentDef.type === 'flat' && segmentDef.items && Array.isArray(segmentDef.items)) {
+      } else if (typedSegmentDef.type === 'flat' && typedSegmentDef.items && Array.isArray(typedSegmentDef.items)) {
         // Handle flat structures (By Nature, By Form, By Packaging Format)
-        segmentDef.items.forEach(item => {
+        typedSegmentDef.items.forEach((item: string) => {
           if (!item) return
           
           const hierarchy: SegmentHierarchy = {
@@ -716,10 +719,10 @@ export async function generateRealisticData(dimensionsData: any): Promise<Compar
             volumeRecords.push(volumeRecord)
           })
         })
-      } else if (segmentDef.type === 'hierarchical' && segmentDef.hierarchy) {
+      } else if (typedSegmentDef.type === 'hierarchical' && typedSegmentDef.hierarchy) {
         // Handle hierarchical structures (By Distribution Channel)
         // Convert hierarchy to structure and get all leaves
-        const hierarchyStructure = convertHierarchyToStructureForData(segmentDef.hierarchy)
+        const hierarchyStructure = convertHierarchyToStructureForData(typedSegmentDef.hierarchy)
         
         // Get all leaf segments from hierarchy
         const getAllLeavesFromHierarchy = (
